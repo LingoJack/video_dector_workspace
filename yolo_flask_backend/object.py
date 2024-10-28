@@ -20,7 +20,7 @@ class ObjectDetector:
         self.stopped = False
 
     def detect(self, frame):
-        print("Detecting...")
+        # print("Detecting...")
         # Adjust frame to fit model input requirements
         im = letterbox(frame, 640, stride=32, auto=True)[0]
         im = im.transpose((2, 0, 1))[::-1]
