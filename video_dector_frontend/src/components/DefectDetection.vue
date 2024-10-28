@@ -19,7 +19,7 @@
 </template>
 
 <script setup>
-import { onMounted, ref } from 'vue';
+import { onMounted, onUnmounted, ref } from 'vue';
 import { io } from 'socket.io-client';
 
 const host = 'http://localhost:5000';
@@ -27,6 +27,7 @@ const socket = io(host); // 创建 WebSocket 连接
 const selectedDeviceId = ref(null);
 const videoDevices = ref([]);
 const captureInterval = 100; // 设置抓取图片的间隔时间（毫秒）
+let intervalId = null; // 用于存储 setInterval 的 ID
 
 // 获取视频输入设备列表
 const getVideoDevices = async () => {
@@ -79,7 +80,7 @@ const sendImageToServer = (stream) => {
   };
 
   // 开始定时抓取帧
-  setInterval(captureFrameAndSend, captureInterval);
+  intervalId = setInterval(captureFrameAndSend, captureInterval);
 };
 
 // 处理缺陷检测结果
@@ -90,16 +91,40 @@ socket.on('defect_result', (data) => {
 const updateDefectOverlay = (data) => {
   const overlayElement = document.getElementById('overlay');
   overlayElement.innerHTML = ''; // 清空之前的框
-  if (data.defect) {
-    const box = document.createElement('div');
-    box.className = 'defect-box';
-    box.style.left = `${data.defect.x}px`;
-    box.style.top = `${data.defect.y}px`;
-    box.style.width = `${data.defect.width}px`;
-    box.style.height = `${data.defect.height}px`;
-    overlayElement.appendChild(box);
+
+  // 创建缺陷框
+  const box = document.createElement('div');
+  box.className = 'defect-box';
+  box.style.left = `${data.x}px`;
+  box.style.top = `${data.y}px`;
+  box.style.width = `${data.width}px`;
+  box.style.height = `${data.height}px`;
+
+  // 根据 ok 字段设置框的颜色
+  if (data.ok) {
+    box.style.borderColor = 'green'; // 如果 ok 为 true，设置绿边
+    box.style.backgroundColor = 'rgba(0, 255, 0, 0.2)'; // 绿色背景
+  } else {
+    box.style.borderColor = 'red';   // 如果 ok 为 false，设置红边
+    box.style.backgroundColor = 'rgba(255, 0, 0, 0.2)'; // 红色背景
   }
+
+  // 将框添加到 overlay 中
+  overlayElement.appendChild(box);
 };
+
+// 组件卸载时清理资源
+onUnmounted(() => {
+  if (intervalId) {
+    clearInterval(intervalId);
+  }
+  const videoElement = document.getElementById('video');
+  if (videoElement && videoElement.srcObject) {
+    const tracks = videoElement.srcObject.getTracks();
+    tracks.forEach(track => track.stop());
+    videoElement.srcObject = null;
+  }
+});
 
 // 组件挂载时获取设备列表
 onMounted(() => {
@@ -109,4 +134,9 @@ onMounted(() => {
 
 <style scoped>
 /* 保持原有的样式不变 */
+.defect-box {
+  position: absolute;
+  border: 2px solid; /* 默认颜色，但会被 JavaScript 覆盖 */
+  border-radius: 4px;
+}
 </style>
