@@ -1,4 +1,5 @@
-import os
+# import os
+import av.error
 from flask import Flask
 from flask_socketio import SocketIO, emit
 from flask_cors import CORS
@@ -7,11 +8,11 @@ import cv2
 import numpy as np
 
 from object import ObjectDetector
-import threading
-
-
-import concurrent.futures
-import time
+# import threading
+# import concurrent.futures
+import av
+import io
+# import time
 
 
 app = Flask(__name__)
@@ -31,37 +32,27 @@ def handle_video_stream(data: dict):
     frame_data = data['frame']
 
     # 将 Base64 数据转换为 NumPy 数组
-    _header, encoded = frame_data.split(';base64,')
-    data = base64.b64decode(encoded)
-
-    temp_file_path = f'/tmp/temp_video_{int(time.time())}_{threading.get_ident()}.mkv'
-    with open(temp_file_path, 'wb') as file:
-        file.write(data)
-    cap = cv2.VideoCapture(temp_file_path)
-
-    cnt = 0
     try:
-        while cap.isOpened():
-            ret, frame = cap.read()
-            
-            if not ret:
-                print('Video stream ended')
-                break
-            cnt += 1
-
-            if frame is not None:
-                # if cnt % 5 == 0:
-                with concurrent.futures.ThreadPoolExecutor() as executor:
-                    future = executor.submit(detector.detect, frame)
-                    try:
-                        boxes = future.result(timeout=0.1)  # 500ms timeout
-                        if boxes is not None:
-                            emit('defect_result', {'defect': boxes})
-                    except concurrent.futures.TimeoutError:
-                        break  # Detection took longer than 500ms, return immediately
-    finally:
-        cap.release()
-        os.remove(temp_file_path)
+        _header, encoded = frame_data.split(';base64,')
+        data = base64.b64decode(encoded, validate=True)
+    except (ValueError, base64.binascii.Error) as e:
+        print(f"Base64 decoding error: {e}")
+        return
+    
+    try:
+        with av.open(io.BytesIO(data)) as container:
+            for frame in container.decode(0):
+                image = cv2.cvtColor(np.array(frame.to_image()), cv2.COLOR_RGB2BGR)
+                # print("detecting")
+                boxes = detector.detect(image)
+                if boxes is not None:
+                    emit('defect_result', {'defect': boxes})
+    except av.error.InvalidDataError as e:
+        print(f"Invalid data error: {e}")
+        # emit('error', {'message': 'Invalid video data'})
+    except Exception as e:
+        print(f"An unexpected error occurred: {e}")
+        # emit('error', {'message': 'An unexpected error occurred'})
 
 
 @socketio.on('image_stream')
@@ -82,9 +73,11 @@ def image_stream(data: dict):
     #     cv2.imwrite('./test_image.jpeg', frame)
 
     # 进行缺陷检测
+    # start = time.time()
     boxes = detector.detect(frame)
     if boxes is not None:
-        print(boxes)
+        # print(f"Detection time: {time.time() - start}")
+        # print(boxes)
         emit('defect_result', {'defect': boxes})
 
 if __name__ == '__main__':
