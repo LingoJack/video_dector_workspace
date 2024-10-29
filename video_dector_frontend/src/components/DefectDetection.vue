@@ -116,17 +116,20 @@ const updateDefectOverlay = (data) => {
   overlayElement.innerHTML = ''; // 清除上一次的检测框
   const box = document.createElement('div');
   box.className = 'defect-box';
-  box.style.left = `${data.x}px`;
-  box.style.top = `${data.y}px`;
-  box.style.width = `${data.width}px`;
-  box.style.height = `${data.height}px`;
+  box.style.position = 'absolute';
+  box.style.left = `${data.defect.x}px`;
+  box.style.top = `${data.defect.y}px`;
+  box.style.width = `${data.defect.width}px`;
+  box.style.height = `${data.defect.height}px`;
 
   if (data.ok) {
-    box.style.borderColor = 'green';
-    box.style.backgroundColor = 'rgba(0, 255, 0, 0.2)';
+    // box.style.borderColor = 'green';
+    // box.style.backgroundColor = 'rgba(0, 255, 0, 0.2)';
+    box.style.border = '2px solid green';
   } else {
-    box.style.borderColor = 'red';
-    box.style.backgroundColor = 'rgba(255, 0, 0, 0.2)';
+    // box.style.borderColor = 'red';
+    // box.style.backgroundColor = 'rgba(255, 0, 0, 0.2)';
+    box.style.border = '2px solid red';
   }
   overlayElement.appendChild(box);
 };

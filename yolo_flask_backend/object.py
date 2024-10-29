@@ -1,3 +1,4 @@
+import time
 import torch
 import numpy as np
 from yolov5.models.common import DetectMultiBackend
@@ -13,7 +14,7 @@ if plt != 'Windows':
 
 class ObjectDetector:
     def __init__(self, model_path='./model_1.0.pt', conf_thres=0.8, iou_thres=0.8, thickness=2):
-        self.model = DetectMultiBackend(weights=model_path, device=torch.device('cpu'))
+        self.model = DetectMultiBackend(weights=model_path, device=torch.device('cuda:0' if torch.cuda.is_available() else 'cpu'))
         self.conf_thres = conf_thres
         self.iou_thres = iou_thres
         self.thickness = thickness
@@ -21,6 +22,7 @@ class ObjectDetector:
 
     def detect(self, frame):
         # print("Detecting...")
+        start = time.time()
         # Adjust frame to fit model input requirements
         im = letterbox(frame, 640, stride=32, auto=True)[0]
         im = im.transpose((2, 0, 1))[::-1]
@@ -35,7 +37,7 @@ class ObjectDetector:
         pred = self.model(im, augment=False, visualize=False)
         pred = non_max_suppression(pred, self.conf_thres, self.iou_thres, classes=None, agnostic=False, max_det=1000)
 
-        
+        print(f"Detection took {time.time() - start} seconds")
         for det in pred:
             if len(det):
                 for *xyxy, conf, cls in reversed(det):
