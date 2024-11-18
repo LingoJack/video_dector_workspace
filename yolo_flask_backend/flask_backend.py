@@ -7,6 +7,7 @@ import base64
 import cv2
 import numpy as np
 import os
+import logging
 
 from object import ObjectDetector
 
@@ -29,18 +30,18 @@ max_connections = 20
 
 @socketio.on('connect')
 def handle_connect():
-    print("Client connected")
+    logging.debug(f"Client {request.sid} connected")
     if len(queues) <= max_connections:
         queues[request.sid] = Queue(maxsize=30)
         threading.Thread(target=sub_detect_thread, args=(request.sid,)).start()
     else:
-        print("Exceeded maximum connections")
+        logging.warning("Exceeded maximum connections")
         socketio.emit('error', {'message': 'Exceeded maximum connections'}, to=request.sid)
 
 
 @socketio.on('disconnect')
 def handle_disconnect():
-    print("Client disconnected")
+    logging.debug(f"Client {request.sid} disconnected")
     del queues[request.sid]
 
 @socketio.on('image_stream')
@@ -72,6 +73,7 @@ def video_stream(data: dict):
                 queues[request.sid].put(image)
     except Exception as e:
         error_msg = f"An error occurred: {str(e)}"
+        logging.error(error_msg)
         socketio.emit('error', {'message': error_msg}, to=request.sid)
 
 def detect_and_emit(sid, frame):
@@ -83,7 +85,7 @@ def detect_with_timeout(sid, frame, timeout):
     try:
         return future.result(timeout=timeout)
     except concurrent.futures.TimeoutError:
-        print("Detection took too long, skipping...")
+        logging.warning(f"Detection timed out for client {sid}")
         return None
 
 def sub_detect_thread(sid: str):
