@@ -28,10 +28,11 @@ const socket = io(host);
 const selectedSource = ref("screen");
 const selectedDeviceId = ref(null);
 const videoDevices = ref([]);
-const captureInterval = 100; // 捕获帧的间隔
+const captureInterval = 100; // 捕获帧的间隔（毫秒）
 let intervalId = null;
 let mediaStream = null;
 
+// 获取视频设备列表
 const getVideoDevices = async () => {
   const devices = await navigator.mediaDevices.enumerateDevices();
   videoDevices.value = devices.filter(device => device.kind === 'videoinput');
@@ -40,6 +41,7 @@ const getVideoDevices = async () => {
   }
 };
 
+// 启动视频捕获
 const startCapture = async () => {
   stopCapture(); // 停止当前的视频捕获
   if (selectedSource.value === "screen") {
@@ -57,7 +59,7 @@ const startScreenShare = async () => {
     });
     handleStream(mediaStream);
   } catch (err) {
-    console.error("Screen capture error:", err);
+    console.error("屏幕共享错误:", err);
   }
 };
 
@@ -75,7 +77,7 @@ const startCameraCapture = async () => {
     mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
     handleStream(mediaStream);
   } catch (err) {
-    console.error("Camera capture error:", err);
+    console.error("摄像头捕获错误:", err);
   }
 };
 
@@ -111,27 +113,30 @@ socket.on('defect_result', (data) => {
   updateDefectOverlay(data);
 });
 
+// 修改后的 updateDefectOverlay 函数，支持多组缺陷数据
 const updateDefectOverlay = (data) => {
   const overlayElement = document.getElementById('overlay');
   overlayElement.innerHTML = ''; // 清除上一次的检测框
-  const box = document.createElement('div');
-  box.className = 'defect-box';
-  box.style.position = 'absolute';
-  box.style.left = `${data.defect.x}px`;
-  box.style.top = `${data.defect.y}px`;
-  box.style.width = `${data.defect.width}px`;
-  box.style.height = `${data.defect.height}px`;
 
-  if (data.ok) {
-    // box.style.borderColor = 'green';
-    // box.style.backgroundColor = 'rgba(0, 255, 0, 0.2)';
-    box.style.border = '2px solid green';
+  // 检查 data.defects 是否存在且为数组
+  if (data.defects && Array.isArray(data.defects)) {
+    data.defects.forEach(defect => {
+      const box = document.createElement('div');
+      box.className = 'defect-box';
+      box.style.position = 'absolute';
+      box.style.left = `${defect.x}px`;
+      box.style.top = `${defect.y}px`;
+      box.style.width = `${defect.width}px`;
+      box.style.height = `${defect.height}px`;
+
+      // 根据缺陷状态设置边框颜色
+      box.style.border = defect.ok ? '2px solid green' : '2px solid red';
+
+      overlayElement.appendChild(box);
+    });
   } else {
-    // box.style.borderColor = 'red';
-    // box.style.backgroundColor = 'rgba(255, 0, 0, 0.2)';
-    box.style.border = '2px solid red';
+    console.warn('缺陷数据格式不正确:', data);
   }
-  overlayElement.appendChild(box);
 };
 
 // 停止视频捕获
